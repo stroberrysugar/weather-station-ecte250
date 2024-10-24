@@ -1,0 +1,255 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Wireless Weather Station</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            background-color: #f0f8ff;
+            color: #333;
+            margin: 0;
+            padding: 0;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+        }
+
+        .container {
+            background-color: #fff;
+            padding: 20px;
+            border-radius: 10px;
+            box-shadow: 0 0 10px rgba(0, 0, 0, 0.1);
+            max-width: 400px;
+            width: 90%;
+        }
+
+        .header {
+            text-align: center;
+            margin-bottom: 20px;
+        }
+
+        .header h1 {
+            margin: 0;
+            font-size: 24px;
+            color: #007acc;
+        }
+
+        .stats,
+        .controls {
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+        }
+
+        .stat-item {
+            display: flex;
+            justify-content: space-between;
+            font-size: 18px;
+            padding: 10px;
+            border-radius: 5px;
+            background-color: #f7f9fa;
+        }
+
+        .stat-item span {
+            font-weight: bold;
+        }
+
+        @media (max-width: 600px) {
+            .header h1 {
+                font-size: 20px;
+            }
+
+            .stat-item {
+                font-size: 16px;
+            }
+        }
+
+        #toggleLedButton {
+            width: 100%;
+        }
+
+        #textInput {
+            width: 100%;
+        }
+
+        #error {
+            font-size: 0.75rem;
+            color: red;
+            margin-top: 1rem;
+        }
+
+        #error:not(.visible) {
+            display: none;
+        }
+
+        #connected:not(.visible) {
+            display: none;
+        }
+
+        .input {
+            width: 100%;
+            padding: 0.5rem;
+            margin-top: 0.5rem;
+            box-sizing: border-box;
+        }
+
+        .wifiCred:not(.visible) {
+            display: none;
+        }
+    </style>
+</head>
+
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>Wireless Weather Station</h1>
+        </div>
+        <div class="settings-section">
+            <div style="font-weight: 900;">
+                Connect to <span id="ssid"></span>
+            </div>
+            <div style="margin-top: 0.5rem; margin-bottom: 0.5rem; font-size: 0.75rem;">
+                Encryption type: <span id="encType"></span>
+            </div>
+            <input id="wifiIdent" type="text" class="input wifiCred" placeholder="Identity" required />
+            <input id="wifiUser" type="text" class="input wifiCred" placeholder="Username" required />
+            <input id="wifiPass" type="password" class="input wifiCred" placeholder="Password" required />
+            <button id="connectButton" style="margin-top: 1rem; padding: 0.5rem;" onclick="connect()">Connect</button>
+        </div>
+        <div id="error">Error text blah</div>
+    </div>
+
+    <script>
+        const connectButton = document.getElementById("connectButton");
+        const ssidSpan = document.getElementById("span");
+        const encType = document.getElementById("encType");
+        const wifiIdent = document.getElementById("wifiIdent");
+        const wifiUser = document.getElementById("wifiUser");
+        const wifiPass = document.getElementById("wifiPass");
+        const errorDisplay = document.getElementById("error");
+
+        const wifiCreds = [wifiIdent, wifiUser, wifiPass];
+
+        let errorNumber = 0;
+        let ssid;
+        let type;
+
+        async function connect() {
+            connectButton.setAttribute("disabled", "");
+
+            wifiCreds.forEach(elem => elem.setAttribute("disabled", ""));
+
+            await connect_()
+                .then(() => {
+                    errorDisplay.classList.remove("visible");
+
+                    errorNumber = 0;
+                })
+                .catch(e => {
+                    errorDisplay.innerText = `(${errorNumber}) ${e}`;
+                    errorDisplay.classList.add("visible");
+
+                    errorNumber = errorNumber + 1;
+                })
+                .finally(() => {
+                    wifiCreds.forEach(elem => elem.removeAttribute("disabled"));
+                    connectButton.removeAttribute("disabled");
+                });
+        }
+
+        async function connect_() {
+            let body;
+
+            switch (type) {
+                case 1:
+                    body = { type, ssid };
+                    break;
+                case 2:
+                    wifiPass.reportValidity();
+                    body = { type, ssid, password: wifiPass.value };
+                    break;
+                case 3:
+                    wifiCreds.forEach(elem => elem.reportValidity());
+                    body = {
+                        type,
+                        ssid,
+                        identity: wifiIdent.value,
+                        username: wifiUser.value,
+                        password: wifiPass.value
+                    };
+                    break;
+            }
+
+            const connectResponse = await fetch(`/api/connect`, {
+                method: "POST",
+                headers: {
+                    "content-type": "application/json"
+                },
+                body: JSON.stringify(body)
+            });
+
+            if (!connectResponse.ok) {
+                throw "Failed to connect";
+            }
+
+            let iterations = 0;
+
+            while (true) {
+                await new Promise(r => setTimeout(r, 2000));
+
+                const dataResponse = await fetch(`/api/get_connecting_status`, {
+                    method: "GET"
+                });
+
+                if (!dataResponse.ok) {
+                    throw await dataResponse.text;
+                }
+
+                const json = await dataResponse.json();
+
+                if (json.connected == true) {
+                    break;
+                }
+
+                iterations += 1;
+
+                if (iterations == 5) {
+                    throw "Failed to connect";
+                }
+            }
+        }
+
+        window.addEventListener("load", (event) => {
+            const urlParams = new URLSearchParams(window.location.search);
+            ssid = urlParams.get("ssid");
+            type = parseInt(urlParams.get("type"));
+
+            if (ssid == null || type == null) {
+                alert("WiFi network not specified");
+                return;
+            }
+
+            ssidSpan.innerText = ssid;
+            encType.innerText = urlParams.get("encType");
+
+            switch (type) {
+                case 1:
+                    break;
+                case 2:
+                    wifiPass.classList.add("visible");
+                    break;
+                case 3:
+                    wifiIdent.classList.add("visible");
+                    wifiUser.classList.add("visible");
+                    wifiPass.classList.add("visible");
+                    break;
+            }
+        });
+    </script>
+</body>
+
+</html>

@@ -1,0 +1,467 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+    <title>ECTE250 Weather Station Dashboard</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta charset="utf-8" />
+
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link rel="stylesheet"
+        href="https://fonts.googleapis.com/css2?family=Roboto:ital,wght@0,100;0,300;0,400;0,500;0,700;0,900;1,100;1,300;1,400;1,500;1,700;1,900&display=swap" />
+
+    <script src="https://kit.fontawesome.com/6590493267.js" crossorigin="anonymous"></script>
+
+    <link rel="stylesheet" href="https://api.mapbox.com/mapbox-gl-js/v3.6.0/mapbox-gl.css" />
+    <script src="https://api.mapbox.com/mapbox-gl-js/v3.6.0/mapbox-gl.js"></script>
+
+    <style>
+        html,
+        body {
+            background-color: #131920;
+            margin: 0;
+            height: 100vh;
+        }
+
+        .layout {
+            display: grid;
+            grid-template-columns: 1fr 5fr;
+            height: 100vh;
+        }
+
+        .nav-container {
+            background-color: #141a22;
+            background-image: linear-gradient(#3e4853 33%, rgba(255, 255, 255, 0) 0%);
+            background-position: right;
+            background-size: 1px 8px;
+            background-repeat: repeat-y;
+            display: flex;
+            flex-direction: column;
+        }
+
+        .nav {
+            flex: 1;
+            position: relative;
+            box-shadow: 0.1px 0px 30px 0px #252b31;
+
+            padding: 0.75rem;
+
+            box-sizing: border-box;
+        }
+
+        h2,
+        h3,
+        h4,
+        h5 {
+            margin: 0;
+            font-family: "Roboto", sans-serif;
+            font-weight: 900;
+            font-style: normal;
+        }
+
+        .branding {
+            color: #6293ff;
+            padding: 1rem 1rem 1rem 0.5rem;
+        }
+
+        .section-title {
+            padding: 0.5rem;
+            font-family: "Roboto", sans-serif;
+            font-weight: 400;
+            font-style: normal;
+            color: #7a7d82;
+            font-size: 0.75rem;
+        }
+
+        .section-item {
+            padding: 1rem;
+            font-family: "Roboto", sans-serif;
+            font-weight: 400;
+            font-style: normal;
+            color: #5179d1;
+            background-color: #202d44;
+            border-radius: 0.5rem;
+        }
+
+        .section-item-icon {
+            margin-right: 0.25rem;
+        }
+
+        .main-view {
+            padding: 1.5rem;
+            padding-left: 2.5rem;
+
+            box-sizing: border-box;
+
+            display: flex;
+            flex-direction: column;
+        }
+
+        .main-widgets {
+            display: grid;
+            grid-template-columns: 1fr 1fr 1fr 1fr 1fr;
+        }
+
+        .widget {
+            padding: 1rem;
+            background-color: #1d2630;
+            border-radius: 0.5rem;
+            border: 1px solid #212a34;
+
+            display: flex;
+            flex-direction: column;
+
+            margin-right: 1rem;
+        }
+
+        .widget-header {
+            color: white;
+            font-family: "Roboto", sans-serif;
+            font-weight: 400;
+            font-style: normal;
+
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+
+            margin-bottom: 0.75rem;
+        }
+
+        .widget-header-content {
+            display: flex;
+            align-items: center;
+        }
+
+        .widget-title {
+            font-weight: 900;
+        }
+
+        .widget-icon {
+            display: flex;
+            font-size: 1.2rem;
+            margin-right: 0.5rem;
+            background-color: #1e3a97;
+            color: #5381eb;
+            padding: 0.5rem;
+            border-radius: 0.5rem;
+            aspect-ratio: 1 / 1;
+        }
+
+        .widget-content {
+            color: white;
+            font-family: "Roboto", sans-serif;
+            font-weight: 900;
+            font-size: 1.5rem;
+            font-style: normal;
+
+            background-color: #131920;
+            border-radius: 0.5rem;
+            padding: 1rem;
+
+            display: flex;
+            align-items: center;
+        }
+
+        .widget-content-tiny {
+            font-size: 0.85rem;
+            margin-left: 0.5rem;
+        }
+
+        .map-widget {
+            margin-top: 1rem;
+            flex: 1;
+        }
+
+        .map-container {
+            position: relative;
+            height: 100%;
+        }
+
+        .map {
+            position: absolute;
+            top: 0;
+            bottom: 0;
+            width: 100%;
+            border-radius: 0.5rem;
+        }
+
+        .map:not(.visible) {
+            display: none;
+        }
+
+        .map-device-marker {
+            display: block;
+            border: none;
+            border-radius: 50%;
+            cursor: pointer;
+            padding: 0;
+        }
+
+        .profile-picture {
+            width: 50px;
+        }
+
+        .nav-footer {
+            display: flex;
+            box-sizing: border-box;
+            padding: 1rem;
+            color: #c5c7ca;
+            align-items: center;
+
+            border-top: 1px solid #3e4853;
+        }
+
+        .nav-footer .left-side {
+            display: flex;
+            flex: 1;
+        }
+
+        .user-details {
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            margin-left: 0.5rem;
+        }
+
+        .user-details .name {
+            font-family: "Roboto", sans-serif;
+            font-weight: 900;
+            font-style: normal;
+        }
+
+        .user-details .email {
+            font-family: "Roboto", sans-serif;
+            font-style: normal;
+            color: #696d72;
+        }
+
+        .dropdown-container {
+            position: relative;
+        }
+
+        .dropdown-content {
+            position: absolute;
+            background-color: #202d44;
+            border: 1px solid #3e4853;
+            border-radius: 0.25rem;
+            z-index: 1000;
+            left: 0;
+        }
+
+        .dropdown-content:not(.visible) {
+            display: none;
+        }
+
+        .dropdown-option {
+            padding: 0.75rem;
+            user-select: none;
+
+            font-family: "Roboto", sans-serif;
+            font-style: normal;
+            font-size: 0.85rem;
+        }
+
+        .dropdown-option:hover {
+            background-color: #283a58;
+        }
+
+        .widget-control:hover {
+            color: rgb(214, 214, 214);
+        }
+    </style>
+
+    <script>
+        function createDropdown(name) {
+            let button = document.getElementById(`drp_${name}_button`);
+            let content = document.getElementById(`drp_${name}`);
+
+            button.addEventListener('click', (event) => {
+                event.stopPropagation();
+                content.classList.toggle("visible");
+
+                // Get the bounding rectangles
+                const buttonRect = button.getBoundingClientRect();
+                const contentRect = content.getBoundingClientRect();
+
+                // Get viewport width
+                const viewportWidth = window.innerWidth || document.documentElement.clientWidth;
+
+                // Check if the dropdown will go out of the viewport
+                if (buttonRect.left + contentRect.width > viewportWidth) {
+                    // Position dropdown to the left
+                    content.style.left = 'auto';
+                    content.style.right = '0';
+                } else {
+                    // Position dropdown to the default
+                    content.style.left = '0';
+                    content.style.right = 'auto';
+                }
+            });
+
+            content.addEventListener('click', () => {
+                content.classList.remove("visible");
+            });
+
+            // Close the dropdown if click occurs outside of it
+            document.addEventListener('click', (event) => {
+                if (!content.contains(event.target) && event.target !== button) {
+                    content.classList.remove("visible");
+                }
+            });
+        }
+
+    </script>
+
+    <script src="site.js"></script>
+</head>
+
+<body>
+    <div class="layout">
+        <div class="nav-container">
+            <div class="nav">
+                <h2 class="branding">Weather Station</h2>
+                <div class="section">
+                    <div class="section-title">MAIN</div>
+                    <div class="section-item">
+                        <i class="section-item-icon fa-solid fa-house"></i>
+                        <span class="section-item-description">Dashboard</span>
+                    </div>
+                </div>
+            </div>
+            <div class="nav-footer">
+                <div class="left-side">
+                    <img class="profile-picture"
+                        src="https://upload.wikimedia.org/wikipedia/commons/thumb/a/ac/Eo_circle_pink_white_letter-m.svg/1024px-Eo_circle_pink_white_letter-m.svg.png" />
+
+                    <div class="user-details">
+                        <div class="name">Mathew</div>
+                        <div class="email">Device ID: 0a1c3bbf72</div>
+                    </div>
+                </div>
+                <i class="fa-solid fa-angle-right"></i>
+            </div>
+        </div>
+        <div class="main-view">
+            <div class="main-widgets">
+                <div class="widget">
+                    <div class="widget-header">
+                        <div class="widget-header-content">
+                            <div class="widget-icon">
+                                <i class="fa-solid fa-temperature-low"></i>
+                            </div>
+                            <span class="widget-title">Temperature</span>
+                        </div>
+                        <div class="dropdown-container">
+                            <i id="drp_units-temp_button" class="widget-control fa-solid fa-ellipsis-vertical"></i>
+                            <div id="drp_units-temp" class="dropdown-content">
+                                <div class="dropdown-option">Degrees</div>
+                                <div class="dropdown-option">Fahrenheit</div>
+                            </div>
+                        </div>
+
+                        <script>
+                            createDropdown("units-temp");
+                        </script>
+                    </div>
+                    <span class="widget-content"><span id="value-temperature">...</span>&nbsp;°C</span>
+                </div>
+                <div class="widget">
+                    <div class="widget-header">
+                        <div class="widget-header-content">
+                            <div class="widget-icon">
+                                <i class="fa-solid fa-wind"></i>
+                            </div>
+                            <span class="widget-title">Wind speed</span>
+                        </div>
+                        <i class="widget-control fa-solid fa-ellipsis-vertical"></i>
+                    </div>
+                    <div class="widget-content">
+                        <span><span id="value-wind_speed">...</span> km/h</span>
+                        <span class="widget-content-tiny">
+                            &#40;
+                            <i class="fa-solid fa-compass"></i>
+                            <span id="value-wind_direction">...</span>
+                            &#41;
+                        </span>
+                    </div>
+                </div>
+                <div class="widget">
+                    <div class="widget-header">
+                        <div class="widget-header-content">
+                            <div class="widget-icon">
+                                <i class="fa-solid fa-sun"></i>
+                            </div>
+                            <span class="widget-title">UV index</span>
+                        </div>
+                        <i class="widget-control fa-solid fa-ellipsis-vertical"></i>
+                    </div>
+                    <div class="widget-content">
+                        <span>
+                            <span id="value-uv_index">...</span>
+                            &nbsp;&#40;
+                            <span id="value-uv_index_rating">...</span>
+                            &#41;
+                        </span>
+                    </div>
+                </div>
+                <div class="widget">
+                    <div class="widget-header">
+                        <div class="widget-header-content">
+                            <div class="widget-icon">
+                                <i class="fa-solid fa-water"></i>
+                            </div>
+                            <span class="widget-title">Humidity</span>
+                        </div>
+                        <i class="widget-control fa-solid fa-ellipsis-vertical"></i>
+                    </div>
+                    <span class="widget-content"><span id="value-humidity">...</span>%</span>
+                </div>
+                <div class="widget">
+                    <div class="widget-header">
+                        <div class="widget-header-content">
+                            <div class="widget-icon">
+                                <i class="fa-solid fa-gauge"></i>
+                            </div>
+                            <span class="widget-title">Pressure</span>
+                        </div>
+                        <i class="widget-control fa-solid fa-ellipsis-vertical"></i>
+                    </div>
+                    <span class="widget-content"><span id="value-pressure">...</span> hPa</span>
+                </div>
+            </div>
+            <div class="map-widget widget">
+                <div class="widget-header">
+                    <div class="widget-header-content">
+                        <div class="widget-icon">
+                            <i class="fa-solid fa-map"></i>
+                        </div>
+                        <span class="widget-title">Map</span>
+                    </div>
+
+                    <div class="dropdown-container">
+                        <i id="drp_map_button" class="widget-control fa-solid fa-ellipsis-vertical"></i>
+                        <div id="drp_map" class="dropdown-content" style="width: 150px;">
+                            <div class="dropdown-option" onclick="changeMap('device')">Device location</div>
+                            <div class="dropdown-option" onclick="changeMap('wind')">Wind data</div>
+                        </div>
+                    </div>
+
+                    <script>
+                        createDropdown("map");
+                    </script>
+                </div>
+                <div class="map-container">
+                    <div id="map1" class="map visible"></div>
+                    <div id="map2" class="map"></div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script type="module" src="websocket.js"></script>
+    <script type="module" src="map1.js"></script>
+    <script type="module" src="map2.js"></script>
+</body>
+
+</html>

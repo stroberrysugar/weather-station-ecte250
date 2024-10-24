@@ -1,0 +1,245 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Wireless Weather Station</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            background-color: #f0f8ff;
+            color: #333;
+            margin: 0;
+            padding: 0;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+        }
+
+        .container {
+            background-color: #fff;
+            padding: 20px;
+            border-radius: 10px;
+            box-shadow: 0 0 10px rgba(0, 0, 0, 0.1);
+            max-width: 400px;
+            width: 90%;
+        }
+
+        .header {
+            text-align: center;
+            margin-bottom: 20px;
+        }
+
+        .header h1 {
+            margin: 0;
+            font-size: 24px;
+            color: #007acc;
+        }
+
+        .stats,
+        .controls {
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+        }
+
+        .stat-item {
+            display: flex;
+            justify-content: space-between;
+            font-size: 18px;
+            padding: 10px;
+            border-radius: 5px;
+            background-color: #f7f9fa;
+        }
+
+        .stat-item span {
+            font-weight: bold;
+        }
+
+        @media (max-width: 600px) {
+            .header h1 {
+                font-size: 20px;
+            }
+
+            .stat-item {
+                font-size: 16px;
+            }
+        }
+
+        #toggleLedButton {
+            width: 100%;
+        }
+
+        #textInput {
+            width: 100%;
+        }
+
+        #error {
+            font-size: 0.75rem;
+            color: red;
+            margin-top: 1rem;
+        }
+
+        #error:not(.visible) {
+            display: none;
+        }
+
+        #connected:not(.visible) {
+            display: none;
+        }
+    </style>
+</head>
+
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>Wireless Weather Station</h1>
+        </div>
+        <div class="settings-section">
+            <div style="font-weight: 900;">
+                Change network
+            </div>
+            <div style="margin-top: 0.5rem; margin-bottom: 0.5rem; font-size: 0.75rem;">
+                In here you can change the WiFi network the weather station connects to when sending the data to our
+                servers.
+            </div>
+            <div style="margin-top: 0.5rem; margin-bottom: 0.5rem; font-size: 0.75rem;">
+                Currently connected to <b id="currentNetwork"></b>
+                <span id="connected">&nbsp;with IP address <b id="currentIp"></b></span>
+            </div>
+            <select id="wifiDropdown" style="width: 100%; padding: 0.5rem; margin-top: 0.5rem; box-sizing: border-box;"
+                disabled>
+            </select>
+            <button id="scanButton" style="margin-top: 1rem; padding: 0.5rem;" disabled
+                onclick="scanNetworks()">Scan</button>
+        </div>
+        <div id="error">Error text blah</div>
+    </div>
+
+    <script>
+        const scanButton = document.getElementById("scanButton");
+        const wifiDropdown = document.getElementById("wifiDropdown");
+        const currentNetwork = document.getElementById("currentNetwork");
+        const errorDisplay = document.getElementById("error");
+        const isConnected = document.getElementById("connected");
+        const currentIp = document.getElementById("currentIp");
+
+        let errorNumber = 0;
+
+        async function scanNetworks() {
+            const scanningText = document.createElement("option");
+            scanningText.innerText = "Scanning...";
+
+            scanButton.setAttribute("disabled", "");
+            wifiDropdown.setAttribute("disabled", "");
+
+            Array.from(wifiDropdown.children).forEach(child => {
+                wifiDropdown.removeChild(child);
+            });
+
+            wifiDropdown.appendChild(scanningText);
+
+            await scanNetworks_()
+                .then(() => {
+                    wifiDropdown.removeChild(scanningText);
+                    errorDisplay.classList.remove("visible");
+                    wifiDropdown.removeAttribute("disabled");
+
+                    errorNumber = 0;
+                })
+                .catch(e => {
+                    Array.from(wifiDropdown.children).forEach(child => {
+                        wifiDropdown.removeChild(child);
+                    });
+
+                    errorDisplay.innerText = `(${errorNumber}) ${e}`;
+                    errorDisplay.classList.add("visible");
+
+                    errorNumber = errorNumber + 1;
+                })
+                .finally(() => {
+                    scanButton.removeAttribute("disabled");
+                });
+        }
+
+        async function scanNetworks_() {
+            const scanResponse = await fetch(`/api/scan`, {
+                method: "POST"
+            });
+
+            if (!scanResponse.ok) {
+                throw "Failed to scan";
+            }
+
+            let sleepDuration;
+
+            if (errorNumber == 0) {
+                sleepDuration = 5000;
+            } else {
+                sleepDuration = 8000;
+            }
+
+            await new Promise(r => setTimeout(r, sleepDuration));
+
+            const dataResponse = await fetch(`/api/get_network_data`, {
+                method: "GET"
+            });
+
+            const json = await dataResponse.json();
+
+            currentNetwork.innerText = json.current_network;
+
+            if (json.current_ip != null) {
+                isConnected.classList.add("visible");
+                currentIp.innertext = `${json.currentIp}`;
+            } else {
+                isConnected.classList.remove("visible");
+                currentIp.innerText = "<not connected>";
+            }
+
+            const networks = Array.from(json.networks);
+
+            if (networks.length == 0) {
+                const nothingFound = document.createElement("option");
+                nothingFound.innerText = "No networks found";
+                wifiDropdown.appendChild(nothingFound);
+                return;
+            }
+
+            const selectOption = document.createElement("option");
+            selectOption.innerText = "--Select a new network--";
+            wifiDropdown.appendChild(selectOption);
+
+            networks.forEach(network => {
+                const wifiOption = document.createElement("option");
+                wifiOption.innerText = network.ssid;
+                wifiOption.wifiType = network.type;
+                wifiDropdown.appendChild(wifiOption);
+
+                wifiDropdown.addEventListener('change', ev => {
+
+                });
+            });
+
+            /*
+
+            {
+              "current_network": "UOW",
+              "current_ip": null,
+              "networks": [
+                { "ssid": "", "type": 1 }
+              ]
+            }
+
+            */
+        }
+
+        window.addEventListener("load", (event) => {
+            scanNetworks();
+        });
+    </script>
+</body>
+
+</html>
